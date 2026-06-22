@@ -1,4 +1,4 @@
-# inertia-hotwire-native
+# Inertia Hotwire Native
 
 [![CI](https://github.com/zumkorn/inertia-hotwire-native/actions/workflows/ci.yml/badge.svg)](https://github.com/zumkorn/inertia-hotwire-native/actions/workflows/ci.yml)
 

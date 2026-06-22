@@ -1,7 +1,5 @@
-// v4 UUID, matching the format turbo.js / turbo-ios expect for restoration
-// identifiers. Prefers the native generator; falls back for older webviews
-// (WKWebView < iOS 15.4) and non-secure contexts where crypto.randomUUID is
-// unavailable.
+// v4 UUID for restoration identifiers. Falls back to a manual generator on
+// older webviews / non-secure contexts where crypto.randomUUID is unavailable.
 export function uuid() {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID()

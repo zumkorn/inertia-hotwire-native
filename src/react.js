@@ -1,20 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-/**
- * @typedef {object} BridgeMessage
- * @property {string} id
- * @property {string} component
- * @property {string} event
- * @property {Record<string, unknown>} data
- */
-
-/**
- * Generic React wrapper over the web bridge core (window.HotwireNative.web).
- * Returns whether the native app supports `component` and a stable `send`.
- *
- * @param {string} component - Bridge component name (e.g. "form", "menu").
- * @returns {{ supported: boolean, send: (event: string, data?: Record<string, unknown>, callback?: (message: BridgeMessage) => void) => string | null }}
- */
+// Generic React wrapper over the web bridge core (window.HotwireNative.web).
+// Returns whether the native app supports `component` and a stable `send`.
 export function useBridgeComponent(component) {
   const [supported, setSupported] = useState(
     () => !!window.HotwireNative?.web?.supportsComponent(component)
@@ -25,8 +12,8 @@ export function useBridgeComponent(component) {
     const check = () =>
       setSupported(!!window.HotwireNative?.web?.supportsComponent(component))
     check()
-    // Native support can arrive after mount (async handshake). The bridge writes
-    // data-bridge-components on <html>; observe it so we re-check.
+    // Native support can arrive after mount (async handshake); the bridge writes
+    // data-bridge-components on <html>, so observe it and re-check.
     const observer = new MutationObserver(check)
     observer.observe(document.documentElement, {
       attributes: true,
@@ -51,7 +38,6 @@ export function useBridgeComponent(component) {
     [component]
   )
 
-  // Drop our callbacks / queued messages when the component unmounts.
   useEffect(() => {
     const ids = sentIds.current
     return () => {

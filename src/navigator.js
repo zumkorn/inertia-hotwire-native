@@ -25,12 +25,9 @@ export default class Navigator {
   }
 
   get restorationIdentifier() {
-    // Fall back to a generated id when the driver has no restoration identifier.
     return this.driver?.restorationIdentifier || uuid()
   }
 
-  // Called by turbo.js when the native side requests a visit
-  // (visitLocationWithOptionsAndRestorationIdentifier).
   startVisit(locatable, restorationIdentifier, options = {}) {
     log('native', 'startVisit', { location: String(locatable), restorationIdentifier, options })
     this.stop()
@@ -45,8 +42,6 @@ export default class Navigator {
     }
   }
 
-  // Inertia handles its own anchor scrolling, so a visit is never treated as a
-  // same-page anchor jump.
   locationWithActionIsSamePage() {
     return false
   }

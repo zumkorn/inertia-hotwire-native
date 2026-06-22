@@ -1,26 +1,19 @@
 import { log } from './log.js'
 
-// Web side of the Hotwire Native bridge. Pairs with the native bridge.js, which
-// installs window.nativeBridge and, on `web-bridge:ready`, calls our
-// setAdapter(). This reimplements the core of @hotwired/hotwire-native-bridge
-// (just the message-passing runtime — no Stimulus). Exposed as
-// window.HotwireNative.web.
-//
-// Native adapter contract (window.nativeBridge): platform, supportedComponents,
-// supportsComponent(name), receive(message).
+// Web side of the Hotwire Native bridge, exposed as window.HotwireNative.web.
+// Reimplements the message-passing core of @hotwired/hotwire-native-bridge (no
+// Stimulus). The native bridge.js installs window.nativeBridge and calls
+// setAdapter() on `web-bridge:ready`.
 class WebBridge {
   #adapter = null
   #lastMessageId = 0
-  #pendingMessages = [] // messages sent before the adapter connected
+  #pendingMessages = [] // sent before the adapter connected
   #callbacks = new Map() // messageId -> callback for native replies
 
   start() {
-    // The native bridge.js listens for this and responds by calling setAdapter.
     document.dispatchEvent(new Event('web-bridge:ready'))
   }
 
-  // Called by the native bridge once it has connected and registered the
-  // components the native app supports.
   setAdapter(adapter) {
     this.#adapter = adapter
     document.documentElement.dataset.bridgePlatform = adapter.platform
@@ -32,8 +25,8 @@ class WebBridge {
     })
   }
 
-  // Reflect the native-supported component list onto <html> so the UI can
-  // react (and so MutationObserver-based hooks can detect support).
+  // Reflect supported components onto <html> so the UI (and MutationObserver
+  // hooks) can react to support changes.
   adapterDidUpdateSupportedComponents() {
     if (this.#adapter) {
       document.documentElement.dataset.bridgeComponents = this.#adapter.supportedComponents.join(' ')
@@ -44,8 +37,7 @@ class WebBridge {
     return !!this.#adapter && this.#adapter.supportsComponent(component)
   }
 
-  // Send a message to native. Returns the message id (used for callback
-  // cleanup), or null if it was queued / the component is unsupported.
+  // Returns the message id, or null if queued / the component is unsupported.
   send({ component, event, data, callback }) {
     if (!this.#adapter) {
       this.#pendingMessages.push({ component, event, data, callback })
@@ -61,7 +53,6 @@ class WebBridge {
     return id
   }
 
-  // A reply from native.
   receive(message) {
     log('native', 'bridge receive', { component: message.component, event: message.event })
     this.#callbacks.get(message.id)?.(message)
