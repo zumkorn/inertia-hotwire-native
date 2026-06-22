@@ -18,6 +18,11 @@ export async function setup({ url = 'http://localhost:3000/' } = {}) {
 
   const winEvents = new EventTarget()
   globalThis.window = globalThis
+  // @inertiajs/core reads navigator.userAgent at import time (scroll.ts). Node
+  // only exposes a global `navigator` from v21+, so polyfill one when absent —
+  // otherwise tests pass on newer Node but throw on Node 20 in CI. On v21+ the
+  // global is a read-only getter, so only define it when missing.
+  if (!globalThis.navigator) globalThis.navigator = { userAgent: 'node' }
   globalThis.addEventListener = (...a) => winEvents.addEventListener(...a)
   globalThis.removeEventListener = (...a) => winEvents.removeEventListener(...a)
   globalThis.dispatchEvent = (e) => winEvents.dispatchEvent(e)
