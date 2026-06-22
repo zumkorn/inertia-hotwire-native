@@ -19,8 +19,11 @@ navigates exactly as usual.
 
 ## Install
 
+> **Beta.** This is a pre-1.0 release published under the `beta` tag; the API
+> may still change.
+
 ```bash
-npm add inertia-hotwire-native
+npm add inertia-hotwire-native@beta
 ```
 
 ## Usage
