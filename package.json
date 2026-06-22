@@ -1,0 +1,63 @@
+{
+  "name": "inertia-hotwire-native",
+  "version": "0.1.0",
+  "description": "Drive Inertia.js navigation and bridge components from Hotwire Native (iOS & Android)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./react": {
+      "types": "./src/react.d.ts",
+      "import": "./src/react.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc",
+    "lint": "oxlint src/ tests/",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm test"
+  },
+  "keywords": [
+    "hotwire",
+    "hotwire-native",
+    "inertia",
+    "inertiajs",
+    "turbo-native",
+    "ios",
+    "android",
+    "rails",
+    "react"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zumkorn/inertia-hotwire-native.git"
+  },
+  "homepage": "https://github.com/zumkorn/inertia-hotwire-native",
+  "bugs": "https://github.com/zumkorn/inertia-hotwire-native/issues",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@inertiajs/core": ">=2.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@inertiajs/core": "^3.0.0",
+    "oxlint": "^1.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0"
+  }
+}
