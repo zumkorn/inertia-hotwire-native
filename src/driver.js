@@ -9,6 +9,11 @@ export default class InertiaDriver {
   #activeVisit = null
   #cancelToken = null
   #restoreCleanup = null
+  // History entries Inertia has pushed in this document. The first page is
+  // written with replaceState, so 0 means the entry behind us is not Inertia's
+  // — stepping back would leave the document rather than restore a page.
+  #pushedEntries = 0
+  #historyTracked = false
 
   constructor(session) {
     this.session = session
@@ -24,7 +29,23 @@ export default class InertiaDriver {
 
   start() {
     log('inertia', 'driver started')
+    this.#trackHistoryDepth()
     this.#setupInertiaListeners()
+  }
+
+  // Counts what Inertia actually writes to history rather than inferring it
+  // from the visits we see, so a navigation that bypasses the driver still
+  // lands in the count.
+  #trackHistoryDepth() {
+    if (this.#historyTracked) return
+    this.#historyTracked = true
+
+    const pushState = window.history.pushState.bind(window.history)
+    window.history.pushState = (...args) => {
+      const result = pushState(...args)
+      this.#pushedEntries += 1
+      return result
+    }
   }
 
   visitStarted(_visit) {}
@@ -93,6 +114,10 @@ export default class InertiaDriver {
       // ever makes that write synchronous, both checks below stop firing and
       // the blank screen comes back.
       if (!window.history.state?.page || window.location.href !== visit.location.href) {
+        // We stepped back onto something that is not the page we asked for,
+        // which means the count above was too high. We are now at the bottom of
+        // this document's Inertia history, whatever the count said.
+        this.#pushedEntries = 0
         // Leaves the entry we stepped onto replaced rather than restored. It is
         // Hotwire's bootstrap document, which is never meant to be visited, so
         // losing it is harmless.
@@ -101,6 +126,7 @@ export default class InertiaDriver {
       }
 
       cleanup()
+      this.#pushedEntries = Math.max(0, this.#pushedEntries - 1)
 
       log('inertia', 'restore from history cache (no request)', { url: window.location.href })
       const adapter = this.adapter
@@ -120,6 +146,15 @@ export default class InertiaDriver {
       if (settled) return
       freshRequest('restore: no cached entry → fresh request')
     }, RESTORE_POPSTATE_TIMEOUT_MS)
+
+    // Stepping back with nothing of ours behind us leaves the document: the web
+    // view paints Hotwire's bootstrap page and the screen visibly blanks before
+    // any of the handlers above can react. The checks in onPopstate can only
+    // recover from that, not prevent it, so don't take the step at all.
+    if (this.#pushedEntries === 0) {
+      freshRequest('restore: at the first entry → fresh request')
+      return
+    }
 
     window.addEventListener('popstate', onPopstate)
     setTimeout(() => window.history.back(), 0)
