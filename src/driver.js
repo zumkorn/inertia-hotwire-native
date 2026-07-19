@@ -9,9 +9,8 @@ export default class InertiaDriver {
   #activeVisit = null
   #cancelToken = null
   #restoreCleanup = null
-  // History entries Inertia has pushed in this document. The first page is
-  // written with replaceState, so 0 means the entry behind us is not Inertia's
-  // — stepping back would leave the document rather than restore a page.
+  // Inertia writes the first page with replaceState, so 0 means the entry
+  // behind us is not one of ours.
   #pushedEntries = 0
   #historyTracked = false
 
@@ -33,9 +32,8 @@ export default class InertiaDriver {
     this.#setupInertiaListeners()
   }
 
-  // Counts what Inertia actually writes to history rather than inferring it
-  // from the visits we see, so a navigation that bypasses the driver still
-  // lands in the count.
+  // Counts history writes rather than the visits we see, so navigations that
+  // bypass the driver still land in the count.
   #trackHistoryDepth() {
     if (this.#historyTracked) return
     this.#historyTracked = true
@@ -99,28 +97,14 @@ export default class InertiaDriver {
     const onPopstate = () => {
       if (settled) return
 
-      // `history.back()` does not always land on the page we are restoring.
-      // Returning to the first web page in a native stack steps onto a
-      // non-Inertia entry (Hotwire's bootstrap document), where popstate still
-      // fires but nothing is restored — the web view just goes blank. Only
-      // treat this as a cache restore if we actually landed on the entry we
-      // asked for; otherwise fetch the page.
+      // Backstop for a #pushedEntries overcount: popstate fires wherever we
+      // land, including on a non-Inertia entry where nothing was restored.
       //
-      // Inertia listens for popstate too, and it registered first, so its
-      // handler runs before this one. On a null state it rewrites the URL back
-      // to the current page, which would mask the mismatch — but that rewrite
-      // is deferred to a microtask (`withThrottleProtection`), so a synchronous
-      // listener still observes the entry we actually landed on. If Inertia
-      // ever makes that write synchronous, both checks below stop firing and
-      // the blank screen comes back.
+      // This only sees the real landing spot because Inertia's own popstate
+      // handler, registered first, defers its URL repair to a microtask. Make
+      // that repair synchronous and both conditions stop firing.
       if (!window.history.state?.page || window.location.href !== visit.location.href) {
-        // We stepped back onto something that is not the page we asked for,
-        // which means the count above was too high. We are now at the bottom of
-        // this document's Inertia history, whatever the count said.
         this.#pushedEntries = 0
-        // Leaves the entry we stepped onto replaced rather than restored. It is
-        // Hotwire's bootstrap document, which is never meant to be visited, so
-        // losing it is harmless.
         freshRequest('restore: landed off-target → fresh request')
         return
       }
@@ -147,10 +131,9 @@ export default class InertiaDriver {
       freshRequest('restore: no cached entry → fresh request')
     }, RESTORE_POPSTATE_TIMEOUT_MS)
 
-    // Stepping back with nothing of ours behind us leaves the document: the web
-    // view paints Hotwire's bootstrap page and the screen visibly blanks before
-    // any of the handlers above can react. The checks in onPopstate can only
-    // recover from that, not prevent it, so don't take the step at all.
+    // Stepping back off our own entries leaves the document, and the web view
+    // paints Hotwire's bootstrap page before anything above can react. The
+    // handlers can only recover from that blank, not prevent it.
     if (this.#pushedEntries === 0) {
       freshRequest('restore: at the first entry → fresh request')
       return
