@@ -64,8 +64,42 @@ export default class InertiaDriver {
     }
     this.#restoreCleanup = cleanup
 
+    const freshRequest = (reason) => {
+      cleanup()
+      log('inertia', reason, { url: visit.location.href })
+      router.visit(visit.location.href, {
+        replace: true,
+        onCancelToken: (token) => {
+          this.#cancelToken = token
+        },
+      })
+    }
+
     const onPopstate = () => {
       if (settled) return
+
+      // `history.back()` does not always land on the page we are restoring.
+      // Returning to the first web page in a native stack steps onto a
+      // non-Inertia entry (Hotwire's bootstrap document), where popstate still
+      // fires but nothing is restored — the web view just goes blank. Only
+      // treat this as a cache restore if we actually landed on the entry we
+      // asked for; otherwise fetch the page.
+      //
+      // Inertia listens for popstate too, and it registered first, so its
+      // handler runs before this one. On a null state it rewrites the URL back
+      // to the current page, which would mask the mismatch — but that rewrite
+      // is deferred to a microtask (`withThrottleProtection`), so a synchronous
+      // listener still observes the entry we actually landed on. If Inertia
+      // ever makes that write synchronous, both checks below stop firing and
+      // the blank screen comes back.
+      if (!window.history.state?.page || window.location.href !== visit.location.href) {
+        // Leaves the entry we stepped onto replaced rather than restored. It is
+        // Hotwire's bootstrap document, which is never meant to be visited, so
+        // losing it is harmless.
+        freshRequest('restore: landed off-target → fresh request')
+        return
+      }
+
       cleanup()
 
       log('inertia', 'restore from history cache (no request)', { url: window.location.href })
@@ -84,14 +118,7 @@ export default class InertiaDriver {
 
     const fallback = setTimeout(() => {
       if (settled) return
-      cleanup()
-      log('inertia', 'restore: no cached entry → fresh request', { url: visit.location.href })
-      router.visit(visit.location.href, {
-        replace: true,
-        onCancelToken: (token) => {
-          this.#cancelToken = token
-        },
-      })
+      freshRequest('restore: no cached entry → fresh request')
     }, RESTORE_POPSTATE_TIMEOUT_MS)
 
     window.addEventListener('popstate', onPopstate)
