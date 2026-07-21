@@ -9,6 +9,10 @@ export default class InertiaDriver {
   #activeVisit = null
   #cancelToken = null
   #restoreCleanup = null
+  // Inertia writes the first page with replaceState, so 0 means the entry
+  // behind us is not one of ours.
+  #pushedEntries = 0
+  #historyTracked = false
 
   constructor(session) {
     this.session = session
@@ -24,7 +28,22 @@ export default class InertiaDriver {
 
   start() {
     log('inertia', 'driver started')
+    this.#trackHistoryDepth()
     this.#setupInertiaListeners()
+  }
+
+  // Counts history writes rather than the visits we see, so navigations that
+  // bypass the driver still land in the count.
+  #trackHistoryDepth() {
+    if (this.#historyTracked) return
+    this.#historyTracked = true
+
+    const pushState = window.history.pushState.bind(window.history)
+    window.history.pushState = (...args) => {
+      const result = pushState(...args)
+      this.#pushedEntries += 1
+      return result
+    }
   }
 
   visitStarted(_visit) {}
@@ -64,9 +83,34 @@ export default class InertiaDriver {
     }
     this.#restoreCleanup = cleanup
 
+    const freshRequest = (reason) => {
+      cleanup()
+      log('inertia', reason, { url: visit.location.href })
+      router.visit(visit.location.href, {
+        replace: true,
+        onCancelToken: (token) => {
+          this.#cancelToken = token
+        },
+      })
+    }
+
     const onPopstate = () => {
       if (settled) return
+
+      // Backstop for a #pushedEntries overcount: popstate fires wherever we
+      // land, including on a non-Inertia entry where nothing was restored.
+      //
+      // This only sees the real landing spot because Inertia's own popstate
+      // handler, registered first, defers its URL repair to a microtask. Make
+      // that repair synchronous and both conditions stop firing.
+      if (!window.history.state?.page || window.location.href !== visit.location.href) {
+        this.#pushedEntries = 0
+        freshRequest('restore: landed off-target → fresh request')
+        return
+      }
+
       cleanup()
+      this.#pushedEntries = Math.max(0, this.#pushedEntries - 1)
 
       log('inertia', 'restore from history cache (no request)', { url: window.location.href })
       const adapter = this.adapter
@@ -84,15 +128,16 @@ export default class InertiaDriver {
 
     const fallback = setTimeout(() => {
       if (settled) return
-      cleanup()
-      log('inertia', 'restore: no cached entry → fresh request', { url: visit.location.href })
-      router.visit(visit.location.href, {
-        replace: true,
-        onCancelToken: (token) => {
-          this.#cancelToken = token
-        },
-      })
+      freshRequest('restore: no cached entry → fresh request')
     }, RESTORE_POPSTATE_TIMEOUT_MS)
+
+    // Stepping back off our own entries leaves the document, and the web view
+    // paints Hotwire's bootstrap page before anything above can react. The
+    // handlers can only recover from that blank, not prevent it.
+    if (this.#pushedEntries === 0) {
+      freshRequest('restore: at the first entry → fresh request')
+      return
+    }
 
     window.addEventListener('popstate', onPopstate)
     setTimeout(() => window.history.back(), 0)
