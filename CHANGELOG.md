@@ -4,6 +4,19 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-beta.1] — 2026-07-25
+
+### Fixed
+
+- Restoring the first web page in a native stack no longer blanks the screen.
+  Stepping back off our own history entries lands on Hotwire's bootstrap
+  document, which the web view paints before any handler can react; the driver
+  now counts the entries Inertia pushes and requests the page without touching
+  history when nothing of ours is behind. (#2)
+- A restore that lands on a non-Inertia entry, or on a URL other than the one
+  asked for, is no longer reported as started, rendered and completed against a
+  blank document — the page is fetched instead.
+
 ## [0.1.0-beta.0] — 2026-06-22
 
 First public beta. Pre-1.0, the API may still change.
